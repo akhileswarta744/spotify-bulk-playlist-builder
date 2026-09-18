@@ -149,6 +149,9 @@ export class SpotifyService {
   /**
    * Create a new playlist for the user.
    */
+  /**
+   * Create a new playlist for the user using official February 2026 /v1/me/playlists endpoint.
+   */
   async createPlaylist(
     userId: string,
     name: string,
@@ -167,24 +170,29 @@ export class SpotifyService {
       'Content-Type': 'application/json',
     };
 
-    // Try encoded userId endpoint first, fallback to /v1/me/playlists
+    // 1. Try modern /v1/me/playlists endpoint first
     try {
-      const encodedUserId = encodeURIComponent(userId.trim());
-      const response = await this.executeWithBackoff<SpotifyPlaylist>(() =>
-        axios.post(`${SPOTIFY_API_BASE}/users/${encodedUserId}/playlists`, payload, { headers })
-      );
-      return response;
-    } catch (err: any) {
-      console.warn('[SpotifyService] Primary playlist endpoint failed, trying /v1/me/playlists fallback...', err?.response?.status);
       const response = await this.executeWithBackoff<SpotifyPlaylist>(() =>
         axios.post(`${SPOTIFY_API_BASE}/me/playlists`, payload, { headers })
       );
       return response;
+    } catch (err: any) {
+      console.warn(
+        `[SpotifyService] /v1/me/playlists returned ${err?.response?.status}. Trying /users/{id}/playlists...`
+      );
     }
+
+    // 2. Fallback to /users/{encodedUserId}/playlists
+    const encodedUserId = encodeURIComponent(userId.trim());
+    const response = await this.executeWithBackoff<SpotifyPlaylist>(() =>
+      axios.post(`${SPOTIFY_API_BASE}/users/${encodedUserId}/playlists`, payload, { headers })
+    );
+    return response;
   }
 
   /**
    * Add tracks to playlist in chunks of 100 preserving exact original order.
+   * Supports modern /v1/playlists/{id}/items and legacy /v1/playlists/{id}/tracks.
    */
   async addTracksToPlaylist(
     playlistId: string,
@@ -198,23 +206,36 @@ export class SpotifyService {
 
     const CHUNK_SIZE = 100; // Spotify max tracks per add-tracks request
     let addedCount = 0;
+    const encodedPlaylistId = encodeURIComponent(playlistId.trim());
+    const headers = {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    };
 
     for (let i = 0; i < trackUris.length; i += CHUNK_SIZE) {
       const chunk = trackUris.slice(i, i + CHUNK_SIZE);
+      const payload = { uris: chunk };
 
-      const encodedPlaylistId = encodeURIComponent(playlistId.trim());
-      await this.executeWithBackoff(() =>
-        axios.post(
-          `${SPOTIFY_API_BASE}/playlists/${encodedPlaylistId}/tracks`,
-          { uris: chunk },
-          {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        )
-      );
+      try {
+        // Modern February 2026 endpoint: /items
+        await this.executeWithBackoff(() =>
+          axios.post(
+            `${SPOTIFY_API_BASE}/playlists/${encodedPlaylistId}/items`,
+            payload,
+            { headers }
+          )
+        );
+      } catch (err: any) {
+        // Fallback to legacy endpoint: /tracks
+        console.warn(`[SpotifyService] /items endpoint returned ${err?.response?.status}. Trying /tracks...`);
+        await this.executeWithBackoff(() =>
+          axios.post(
+            `${SPOTIFY_API_BASE}/playlists/${encodedPlaylistId}/tracks`,
+            payload,
+            { headers }
+          )
+        );
+      }
 
       addedCount += chunk.length;
       if (onProgress) {
