@@ -64,7 +64,20 @@ Finding and adding songs one by one to a playlist is tedious and time-consuming.
   - Search progress bar with percentage and cancel option.
   - Track-by-track addition progress indicator.
 - **Exporting**:
-  - Export final matched list to CSV (`Original Input`, `Spotify Track`, `Artist`, `Album`, `Spotify URI`, `Match Status`) or TXT.
+  - Export final matched list to CSV (`Original Input`, `Spotify Track`, `Artist`, `Album`, `Spotify URI`, `Match Status`, `YouTube Video URL`) or TXT.
+- **YouTube Video Finder (Feature #35)**:
+  - Official YouTube Data API v3 integration to find matching videos for every Spotify song.
+  - Search query constructed from track metadata: `"Title Artist Album"` (e.g. `"Tu Meri Vishal Dadlani Bang Bang"`).
+  - Intelligent Ranking Engine:
+    - **Priority 1**: Official Music Videos (+50 pts)
+    - **Priority 2**: Official Audio & Topic Channels (+40 pts)
+    - **Priority 3**: Verified Label Uploads (+30 pts; T-Series, Sony Music India, Zee Music Company, YRF, Tips, etc.)
+    - **Avoids**: Covers (-80 pts), reactions (-80 pts), karaoke (-50 pts), fan edits (-60 pts), shorts (-60 pts).
+  - View-Only Guarantee: Opens `https://www.youtube.com/watch?v=VIDEO_ID` in a new tab; no scraping or downloading.
+  - Status Badges: `✓ Video Found`, `⚠ Multiple Videos`, `✕ Video Not Found`.
+  - `[Change Video]` candidate selector modal and custom YouTube link paste with live preview.
+  - In-memory session cache to conserve API quota.
+  - Graceful degradation: Spotify playlist creation is never blocked if YouTube search is unavailable.
 - **Optional AI-Assisted Normalization**:
   - Optional Gemini 3.8 Flash integration (`@google/genai`) for cleaning messy natural language text when `GEMINI_API_KEY` is provided.
 

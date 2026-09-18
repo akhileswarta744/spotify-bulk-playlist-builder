@@ -5,7 +5,7 @@ import { MatchResult } from '../types';
  * Original Input, Spotify Track, Artist, Album, Spotify URI, Match Status
  */
 export function exportToCsv(results: MatchResult[], filename = 'spotify_playlist_matches.csv'): void {
-  const headers = ['Original Input', 'Spotify Track', 'Artist', 'Album', 'Spotify URI', 'Match Status'];
+  const headers = ['Original Input', 'Spotify Track', 'Artist', 'Album', 'Spotify URI', 'Match Status', 'YouTube Video URL'];
 
   const rows = results.map((item) => {
     const originalInput = item.song.raw;
@@ -16,6 +16,7 @@ export function exportToCsv(results: MatchResult[], filename = 'spotify_playlist
     const album = item.selectedTrack ? item.selectedTrack.album.name : 'N/A';
     const uri = item.selectedTrack ? item.selectedTrack.uri : 'N/A';
     const status = item.status.toUpperCase();
+    const ytUrl = item.youtube?.selectedVideo?.videoUrl || 'N/A';
 
     return [
       `"${originalInput.replace(/"/g, '""')}"`,
@@ -24,6 +25,7 @@ export function exportToCsv(results: MatchResult[], filename = 'spotify_playlist
       `"${album.replace(/"/g, '""')}"`,
       `"${uri.replace(/"/g, '""')}"`,
       `"${status}"`,
+      `"${ytUrl.replace(/"/g, '""')}"`,
     ].join(',');
   });
 
@@ -37,11 +39,12 @@ export function exportToCsv(results: MatchResult[], filename = 'spotify_playlist
 export function exportToTxt(results: MatchResult[], filename = 'spotify_playlist_matches.txt'): void {
   const lines = results.map((item, idx) => {
     const num = idx + 1;
+    const ytUrl = item.youtube?.selectedVideo?.videoUrl ? ` [YouTube: ${item.youtube.selectedVideo.videoUrl}]` : '';
     if (item.selectedTrack) {
       const artists = item.selectedTrack.artists.map((a) => a.name).join(', ');
-      return `${num}. ${item.selectedTrack.name} - ${artists} [${item.selectedTrack.uri}] (${item.status.toUpperCase()})`;
+      return `${num}. ${item.selectedTrack.name} - ${artists} [${item.selectedTrack.uri}] (${item.status.toUpperCase()})${ytUrl}`;
     }
-    return `${num}. ${item.song.raw} (NOT FOUND)`;
+    return `${num}. ${item.song.raw} (NOT FOUND)${ytUrl}`;
   });
 
   const txtContent = lines.join('\r\n');

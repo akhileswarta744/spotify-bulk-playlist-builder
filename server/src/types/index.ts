@@ -20,6 +20,29 @@ export interface MatchCandidate {
   reasons: string[];
 }
 
+export type YouTubeBadge = 'Official Music Video' | 'Official Audio' | 'Label Upload' | 'Other';
+export type YouTubeStatus = 'video_found' | 'multiple_videos' | 'video_not_found';
+
+export interface YouTubeVideo {
+  videoId: string;
+  title: string;
+  channelTitle: string;
+  thumbnailUrl: string;
+  videoUrl: string;
+  publishedAt?: string;
+  badge?: YouTubeBadge;
+  rankScore?: number;
+}
+
+export interface YouTubeResult {
+  status: YouTubeStatus;
+  selectedVideo?: YouTubeVideo;
+  candidates: YouTubeVideo[];
+  searchQuery: string;
+  manualUrl?: string;
+  error?: string;
+}
+
 export interface MatchResult {
   id: string;
   song: ParsedSong;
@@ -27,6 +50,7 @@ export interface MatchResult {
   selectedTrack?: SpotifyTrack;
   candidates: MatchCandidate[];
   manualQuery?: string;
+  youtube?: YouTubeResult;
 }
 
 export interface BatchSearchResponse {
@@ -50,3 +74,4 @@ export interface AddTracksRequest {
   playlistId: string;
   trackUris: string[];
 }
+

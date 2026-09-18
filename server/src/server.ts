@@ -10,6 +10,7 @@ dotenv.config();
 import authRoutes from './routes/authRoutes';
 import parserRoutes from './routes/parserRoutes';
 import spotifyRoutes from './routes/spotifyRoutes';
+import youtubeRoutes from './routes/youtubeRoutes';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -53,10 +54,13 @@ app.get('/api/health', (_req: Request, res: Response) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/parser', parserRoutes);
 app.use('/api/spotify', spotifyRoutes);
+app.use('/api/youtube', youtubeRoutes);
 
 app.use('/auth', authRoutes);
 app.use('/parser', parserRoutes);
 app.use('/spotify', spotifyRoutes);
+app.use('/youtube', youtubeRoutes);
+
 
 // 404 Handler
 app.use((_req: Request, res: Response) => {

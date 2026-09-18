@@ -5,6 +5,8 @@ import {
   SpotifyTrack,
   ParsedSong,
   BatchSearchResponse,
+  YouTubeResult,
+  YouTubeVideo,
 } from '../types';
 
 const API_BASE = '/api';
@@ -112,4 +114,34 @@ export const api = {
     );
     return res.data;
   },
+
+  async getYouTubeStatus(): Promise<{ isConfigured: boolean }> {
+    const res = await axios.get(`${API_BASE}/youtube/status`);
+    return res.data;
+  },
+
+  async findYouTube(title: string, artist?: string, album?: string): Promise<YouTubeResult> {
+    const res = await axios.post(`${API_BASE}/youtube/find`, {
+      title,
+      artist,
+      album,
+    });
+    return res.data;
+  },
+
+  async batchFindYouTube(
+    tracks: Array<{ id: string; title: string; artist?: string; album?: string }>
+  ): Promise<{ results: Record<string, YouTubeResult> }> {
+    const res = await axios.post(`${API_BASE}/youtube/batch-find`, { tracks });
+    return res.data;
+  },
+
+  async parseManualYouTubeUrl(
+    url: string,
+    customTitle?: string
+  ): Promise<{ valid: boolean; video?: YouTubeVideo; message?: string }> {
+    const res = await axios.post(`${API_BASE}/youtube/parse-url`, { url, customTitle });
+    return res.data;
+  },
 };
+

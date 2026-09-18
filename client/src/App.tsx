@@ -8,10 +8,12 @@ import { SearchProgressBar } from './components/SearchProgressBar';
 import { MatchReviewCard } from './components/MatchReviewCard';
 import { MultipleMatchesModal } from './components/MultipleMatchesModal';
 import { ManualSearchModal } from './components/ManualSearchModal';
+import { YouTubeCandidateModal } from './components/YouTubeCandidateModal';
 import { PlaylistModal, PlaylistSelectionTarget } from './components/PlaylistModal';
 import { FinalReviewScreen } from './components/FinalReviewScreen';
 import { SuccessScreen } from './components/SuccessScreen';
 import { ExportDropdown } from './components/ExportDropdown';
+import { YouTubeVideo } from './types';
 import {
   Sparkles,
   CheckCircle2,
@@ -23,6 +25,8 @@ import {
   RotateCcw,
   Music2,
   ExternalLink,
+  Youtube,
+  Loader2,
 } from 'lucide-react';
 
 type AppStep = 'input' | 'searching' | 'review' | 'playlist_select' | 'final_review' | 'adding' | 'success';
@@ -61,6 +65,9 @@ export function App() {
   // Active Modals state
   const [candidateModalItem, setCandidateModalItem] = useState<MatchResult | null>(null);
   const [manualSearchModalItem, setManualSearchModalItem] = useState<MatchResult | null>(null);
+  const [youtubeModalItem, setYoutubeModalItem] = useState<MatchResult | null>(null);
+  const [isFindingYouTube, setIsFindingYouTube] = useState<boolean>(false);
+  const [isYouTubeConfigured, setIsYouTubeConfigured] = useState<boolean>(false);
 
   // Target Playlist state
   const [targetPlaylist, setTargetPlaylist] = useState<PlaylistSelectionTarget | null>(null);
@@ -77,9 +84,10 @@ export function App() {
     playlistUrl?: string;
   } | null>(null);
 
-  // Check AI capability on mount
+  // Check AI and YouTube capabilities on mount
   useEffect(() => {
     api.getAiStatus().then((res) => setHasAi(res.available)).catch(() => {});
+    api.getYouTubeStatus().then((res) => setIsYouTubeConfigured(res.isConfigured)).catch(() => {});
   }, []);
 
   // Parse input whenever text changes
@@ -179,12 +187,81 @@ export function App() {
       setMatchResults(response.results);
       setIsSearching(false);
       setStep('review');
+
+      // If YouTube API is configured, search YouTube videos for matched tracks in background
+      if (isYouTubeConfigured) {
+        handleFindAllYouTube(response.results);
+      }
     } catch (err: any) {
       console.error('Search error:', err);
       setIsSearching(false);
       alert(err?.response?.data?.message || 'Spotify search failed. Please verify your connection.');
       setStep('input');
     }
+  };
+
+  // Find YouTube video for a single track
+  const handleFindSingleYouTube = async (item: MatchResult) => {
+    try {
+      const res = await api.findYouTube(
+        item.selectedTrack?.name || item.song.title,
+        item.selectedTrack?.artists?.[0]?.name || item.song.artist,
+        item.selectedTrack?.album?.name
+      );
+      setMatchResults((prev) =>
+        prev.map((m) => (m.id === item.id ? { ...m, youtube: res } : m))
+      );
+    } catch (err) {
+      console.error('Failed to find YouTube video:', err);
+    }
+  };
+
+  // Concurrently find YouTube videos for all matched tracks
+  const handleFindAllYouTube = async (resultsToProcess?: MatchResult[]) => {
+    const target = resultsToProcess || matchResults;
+    const eligibleTracks = target
+      .filter((m) => !m.excluded && m.selectedTrack)
+      .map((m) => ({
+        id: m.id,
+        title: m.selectedTrack!.name,
+        artist: m.selectedTrack!.artists?.[0]?.name,
+        album: m.selectedTrack!.album?.name,
+      }));
+
+    if (eligibleTracks.length === 0) return;
+
+    try {
+      setIsFindingYouTube(true);
+      const { results } = await api.batchFindYouTube(eligibleTracks);
+      setMatchResults((prev) =>
+        prev.map((m) => (results[m.id] ? { ...m, youtube: results[m.id] } : m))
+      );
+    } catch (err) {
+      console.error('Batch YouTube find error:', err);
+    } finally {
+      setIsFindingYouTube(false);
+    }
+  };
+
+  // Select candidate or custom YouTube video
+  const handleSelectYouTubeVideo = (itemId: string, video: YouTubeVideo) => {
+    setMatchResults((prev) =>
+      prev.map((item) => {
+        if (item.id !== itemId) return item;
+        const currentYt = item.youtube;
+        const candidates = currentYt?.candidates || [];
+        const exists = candidates.some((c) => c.videoId === video.videoId);
+        return {
+          ...item,
+          youtube: {
+            status: 'video_found',
+            selectedVideo: video,
+            candidates: exists ? candidates : [video, ...candidates],
+            searchQuery: currentYt?.searchQuery || `${item.song.title} ${item.song.artist || ''}`.trim(),
+          },
+        };
+      })
+    );
   };
 
   // Track selection updates from modals
@@ -423,7 +500,20 @@ export function App() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => handleFindAllYouTube()}
+                    disabled={isFindingYouTube || summary.included === 0}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-950/60 hover:bg-red-900/80 text-red-300 border border-red-800/80 flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                    title="Search and attach YouTube videos for all matched songs"
+                  >
+                    {isFindingYouTube ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-red-400" />
+                    ) : (
+                      <Youtube className="w-3.5 h-3.5 text-red-500 fill-current" />
+                    )}
+                    <span>{isFindingYouTube ? 'Finding Videos...' : 'Find YouTube Videos'}</span>
+                  </button>
                   <ExportDropdown results={matchResults} />
                   <button
                     onClick={() => setStep('input')}
@@ -572,6 +662,8 @@ export function App() {
                   onChangeMatch={(it) => setCandidateModalItem(it)}
                   onSearchManually={(it) => setManualSearchModalItem(it)}
                   onToggleExclude={handleToggleExclude}
+                  onFindYouTube={handleFindSingleYouTube}
+                  onChangeYouTubeVideo={(it) => setYoutubeModalItem(it)}
                 />
               ))}
 
@@ -654,6 +746,14 @@ export function App() {
           accessToken={accessToken}
           onClose={() => setManualSearchModalItem(null)}
           onSelectTrack={handleSelectCandidateTrack}
+        />
+      )}
+
+      {youtubeModalItem && (
+        <YouTubeCandidateModal
+          item={youtubeModalItem}
+          onClose={() => setYoutubeModalItem(null)}
+          onSelectVideo={handleSelectYouTubeVideo}
         />
       )}
     </div>
