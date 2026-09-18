@@ -33,7 +33,7 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({
   const [newDesc, setNewDesc] = useState<string>(
     'Created using Spotify Bulk Playlist Builder (Hukha Mar)'
   );
-  const [isPublic, setIsPublic] = useState<boolean>(false);
+  const [isPublic, setIsPublic] = useState<boolean>(true);
 
   // Existing Playlists State
   const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([]);
