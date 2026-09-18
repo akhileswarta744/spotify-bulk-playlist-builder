@@ -49,10 +49,14 @@ app.get('/api/health', (_req: Request, res: Response) => {
   });
 });
 
-// Mount Routes
+// Mount Routes (support both /api/* and direct /* for Vercel serverless compatibility)
 app.use('/api/auth', authRoutes);
 app.use('/api/parser', parserRoutes);
 app.use('/api/spotify', spotifyRoutes);
+
+app.use('/auth', authRoutes);
+app.use('/parser', parserRoutes);
+app.use('/spotify', spotifyRoutes);
 
 // 404 Handler
 app.use((_req: Request, res: Response) => {
