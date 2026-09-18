@@ -156,23 +156,31 @@ export class SpotifyService {
     isPublic: boolean = false,
     accessToken: string
   ): Promise<SpotifyPlaylist> {
-    const response = await this.executeWithBackoff<SpotifyPlaylist>(() =>
-      axios.post(
-        `${SPOTIFY_API_BASE}/users/${userId}/playlists`,
-        {
-          name,
-          description,
-          public: isPublic,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      )
-    );
-    return response;
+    const payload = {
+      name,
+      description,
+      public: isPublic,
+    };
+
+    const headers = {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    };
+
+    // Try encoded userId endpoint first, fallback to /v1/me/playlists
+    try {
+      const encodedUserId = encodeURIComponent(userId.trim());
+      const response = await this.executeWithBackoff<SpotifyPlaylist>(() =>
+        axios.post(`${SPOTIFY_API_BASE}/users/${encodedUserId}/playlists`, payload, { headers })
+      );
+      return response;
+    } catch (err: any) {
+      console.warn('[SpotifyService] Primary playlist endpoint failed, trying /v1/me/playlists fallback...', err?.response?.status);
+      const response = await this.executeWithBackoff<SpotifyPlaylist>(() =>
+        axios.post(`${SPOTIFY_API_BASE}/me/playlists`, payload, { headers })
+      );
+      return response;
+    }
   }
 
   /**
@@ -194,9 +202,10 @@ export class SpotifyService {
     for (let i = 0; i < trackUris.length; i += CHUNK_SIZE) {
       const chunk = trackUris.slice(i, i + CHUNK_SIZE);
 
+      const encodedPlaylistId = encodeURIComponent(playlistId.trim());
       await this.executeWithBackoff(() =>
         axios.post(
-          `${SPOTIFY_API_BASE}/playlists/${playlistId}/tracks`,
+          `${SPOTIFY_API_BASE}/playlists/${encodedPlaylistId}/tracks`,
           { uris: chunk },
           {
             headers: {
@@ -264,9 +273,7 @@ export class SpotifyService {
   }
 
   private formatSpotifyError(err: AxiosError | any): void {
-    const errorData = err?.response?.data?.error;
-    const message = typeof errorData === 'object' ? errorData?.message : errorData || err?.message;
-    console.error(`[Spotify API Error] Status: ${err?.response?.status}, Message: ${message}`);
+    console.error(`[Spotify API Error] Status: ${err?.response?.status}`, JSON.stringify(err?.response?.data || err?.message));
   }
 }
 
